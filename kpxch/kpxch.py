@@ -661,10 +661,6 @@ def main():
                     entry = entries[0]
                     show_entry(entry, args)
 
-    # resp = c.get_databasehash()
-    # print(resp)
-    # resp = c.generate_password()
-
 
 if __name__ == "__main__":
     main()
