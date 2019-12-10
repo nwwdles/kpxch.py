@@ -541,7 +541,7 @@ def parse_args(args_in=None):
     )
     parser.add_argument(
         "-f",
-        "--all-fields",
+        "--full",
         action="store_true",
         dest="show_all",
         help="print all fields",
@@ -586,7 +586,6 @@ def parse_args(args_in=None):
         dest="json",
     )
     parser.add_argument(
-        "-F",
         "--eval",
         metavar="SH",
         dest="eval_format",
