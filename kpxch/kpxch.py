@@ -120,16 +120,18 @@ def show_entry(entry: dict, args, entry_index=None):
 
     to_print = []
 
-    def add_field(n, p, v):
+    def add_field(value, field_prefix, eval_var):
         if not field_prefixes:
-            p = None
+            field_prefix = None
         if not eval_format:
-            v = None
+            eval_var = None
         else:
             if entry_index:
-                v = str(entry_index) + v
-            v = "KPXC" + v
-        to_print.append(make_field(n, shell_escape, p, v, eval_format))
+                eval_var = str(entry_index) + eval_var
+            eval_var = "KPXC" + eval_var
+        to_print.append(
+            make_field(value, shell_escape, field_prefix, eval_var, eval_format)
+        )
 
     if args.show_name or args.show_all:
         add_field(entry["name"], "N", "NAME")
@@ -140,18 +142,18 @@ def show_entry(entry: dict, args, entry_index=None):
     if args.show_uuid or args.show_all:
         add_field(entry["uuid"], "I", "UUID")
     if args.show_stringfields or args.show_all:
-        for i in entry["stringFields"]:
-            for j, key in enumerate(i.keys()):
-                add_field(key, "K", "KEY" + str(j))
-                add_field(i[key], "F", "FIELD" + str(j))
+        for string_field in entry["stringFields"]:
+            for field_num, key in enumerate(string_field.keys()):
+                add_field(key, "K", "KEY" + str(field_num))
+                add_field(string_field[key], "F", "FIELD" + str(field_num))
 
     # if no fields were selected, default to password field
     if not to_print:
         add_field(entry["password"], "P", "PASSWORD")
 
     # finally, print
-    for i in to_print:
-        print(i, end=field_separator)
+    for field in to_print:
+        print(field, end=field_separator)
 
     print("", end=entry_separator)
 
