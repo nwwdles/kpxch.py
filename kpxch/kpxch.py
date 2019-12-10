@@ -544,7 +544,7 @@ def parse_args(args_in=None):
         "--full",
         action="store_true",
         dest="show_all",
-        help="print all fields",
+        help="print all entry fields",
     )
     parser.add_argument(
         "-l",
@@ -562,11 +562,14 @@ def parse_args(args_in=None):
         metavar="ID",
         default=DEFAULT_CLIENT_ID,
     )
+
+    state_filepath_shown = DEFAULT_STATE_FILE.replace(os.getenv("HOME"), "${HOME}")
     parser.add_argument(
         "--state",
         dest="file",
-        help=f"set saved association state path. defaults to '{DEFAULT_STATE_FILE}'. if client id is set, filename defaults to ${{client}}.state",
+        help=f"set saved association state path. defaults to '{state_filepath_shown}'. if client id is set and this argument isn't used, filename defaults to ${{clientId}}.state",
     )
+
     parser.add_argument(
         "--socket",
         metavar="PATH",
@@ -595,7 +598,7 @@ def parse_args(args_in=None):
         "--field-prefixes",
         action="store_true",
         dest="field_prefixes",
-        help="prepend fields with a field prefix (N - entry name, U - username, etc.)",
+        help="prepend fields with a field prefix (N - entry name, U - username, P - password, I - uuid, K - field key, V - field value)",
     )
     parser.add_argument(
         "--shell-escape",
