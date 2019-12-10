@@ -145,7 +145,7 @@ def show_entry(entry: dict, args, entry_index=None):
         for string_field in entry["stringFields"]:
             for field_num, key in enumerate(string_field.keys()):
                 add_field(key, "K", "KEY" + str(field_num))
-                add_field(string_field[key], "F", "FIELD" + str(field_num))
+                add_field(string_field[key], "V", "FIELD" + str(field_num))
 
     # if no fields were selected, default to password field
     if not to_print:
