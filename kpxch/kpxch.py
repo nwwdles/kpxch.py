@@ -33,9 +33,9 @@ import shlex
 
 
 DEFAULT_SOCKET_PATH = os.path.join(os.getenv("XDG_RUNTIME_DIR"), "kpxc_server")
-DEFAULT_CLIENT_ID = "kpxc-getter"
+DEFAULT_CLIENT_ID = "kpxch"
 DEFAULT_STATE_FILE = os.path.join(
-    os.getenv("XDG_DATA_HOME"), "kpxc-getter", DEFAULT_CLIENT_ID + ".state"
+    os.getenv("XDG_DATA_HOME"), "kpxch", DEFAULT_CLIENT_ID + ".state"
 )
 
 # region utils
