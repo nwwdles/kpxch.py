@@ -333,6 +333,7 @@ class Connection:
             "nonce": encode(self.nonce),
             "message": encode(encrypted_message),
             "clientID": self.clientid,
+            "triggerUnlock": "true",
         }
         logging.debug("Sending message: " + str(msg))
 
