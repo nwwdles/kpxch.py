@@ -31,12 +31,17 @@ import logging
 import argparse
 import shlex
 
-
 DEFAULT_SOCKET_PATH = os.path.join(os.getenv("XDG_RUNTIME_DIR"), "kpxc_server")
 DEFAULT_CLIENT_ID = "kpxch"
-DEFAULT_STATE_FILE = os.path.join(
-    os.getenv("XDG_DATA_HOME"), "kpxch", DEFAULT_CLIENT_ID + ".state"
+
+DATA_SUBFOLDER_NAME = "kpxch"
+DEFAULT_STATE_FOLDER = os.path.join(
+    os.getenv("XDG_DATA_HOME") or os.path.join(os.getenv("HOME"), ".local", "share"),
+    DATA_SUBFOLDER_NAME,
 )
+DEFAULT_STATE_FILE = os.path.join(DEFAULT_STATE_FOLDER, DEFAULT_CLIENT_ID + ".state")
+
+STRING_FIELD_PREFIX = "KPH: "
 
 # region utils
 
@@ -93,69 +98,63 @@ def make_field(value, shell_escape, prefix=None, shell_var=None, eval_format=Non
     return value
 
 
+def print_entry_formatted(entry, format_str=None, fields_format_str=None):
+    if format_str:
+        # --format '\n' is read as '\\n' forcing user to use $'\n'
+        # this unescapes escaped sequences so that '\n' is read as newline
+        format_str = bytes(format_str, "utf-8").decode("unicode_escape")
+        out = format_str.format(
+            name=entry["name"],
+            login=entry["login"],
+            password=entry["password"],
+            uuid=entry["uuid"],
+            index=entry["index"],
+        )
+        print(out, end="")
+
+    if fields_format_str:
+        fields_format_str = bytes(fields_format_str, "utf-8").decode("unicode_escape")
+        for string_field in entry["stringFields"]:
+            for key in string_field.keys():
+                out = fields_format_str.format(
+                    key=key,
+                    value=string_field[key],
+                    key_stripped=key.lstrip(STRING_FIELD_PREFIX),
+                )
+                print(out, end="")
+
+
 def show_entry(entry: dict, args, entry_index=None):
-    # TODO: move to arguments
-    # var_format = args.var_format
-    field_prefixes = args.field_prefixes
-    shell_escape = args.shell_escape
-    eval_format = args.eval_format
-    null_delimited = args.null_delimited
-    user_field_separator = args.user_field_separator
-    user_entry_separator = args.user_entry_separator
+    entry["index"] = entry_index or 0
 
-    if eval_format:
-        field_separator = "; "
-        entry_separator = "\n"
-    elif null_delimited:
-        field_separator = "\0"
-        entry_separator = "\0"
-    else:
-        field_separator = "\n"
-        entry_separator = "\n"
-
-    if user_field_separator:
-        field_separator = user_field_separator
-    if user_entry_separator:
-        entry_separator = user_entry_separator
+    if args.format_str or args.fields_format_str:
+        print_entry_formatted(entry, args.format_str, args.fields_format_str)
+        return
 
     to_print = []
-
-    def add_field(value, field_prefix, eval_var):
-        if not field_prefixes:
-            field_prefix = None
-        if not eval_format:
-            eval_var = None
-        else:
-            if entry_index:
-                eval_var = str(entry_index) + eval_var
-            eval_var = "KPXC" + eval_var
-        to_print.append(
-            make_field(value, shell_escape, field_prefix, eval_var, eval_format)
-        )
-
     if args.show_name or args.show_all:
-        add_field(entry["name"], "N", "NAME")
+        to_print.append(entry["name"])
     if args.show_username or args.show_all:
-        add_field(entry["login"], "U", "LOGIN")
+        to_print.append(entry["login"])
     if args.show_password or args.show_all:
-        add_field(entry["password"], "P", "PASSWORD")
+        to_print.append(entry["password"])
     if args.show_uuid or args.show_all:
-        add_field(entry["uuid"], "I", "UUID")
+        to_print.append(entry["uuid"])
     if args.show_stringfields or args.show_all:
         for string_field in entry["stringFields"]:
             for field_num, key in enumerate(string_field.keys()):
-                add_field(key, "K", "KEY" + str(field_num))
-                add_field(string_field[key], "V", "FIELD" + str(field_num))
+                to_print.append(key)
+                to_print.append(string_field[key])
 
     # if no fields were selected, default to password field
     if not to_print:
-        add_field(entry["password"], "P", "PASSWORD")
+        to_print.append(entry["password"])
 
-    # finally, print
     for field in to_print:
-        print(field, end=field_separator)
-
-    print("", end=entry_separator)
+        if args.shell_escape:
+            print(shlex.quote(field))
+        else:
+            print(field)
 
 
 # endregion
@@ -174,11 +173,10 @@ class Association:
         self.id_key = None
         self.db_id = None
 
-    def load(self, filename=DEFAULT_STATE_FILE):
+    def load(self, filename):
         """Load association info from the file or generate new info."""
 
         self.filename = filename
-
         try:
             with open(self.filename, "r") as f:
                 logging.info("Loading keypairs.")
@@ -276,7 +274,7 @@ class SocketConnection:
 
 
 class Connection:
-    def __init__(self, clientid=DEFAULT_CLIENT_ID, filename=DEFAULT_STATE_FILE):
+    def __init__(self, clientid, filename):
         self.filename = filename
         self.clientid = clientid
 
@@ -287,10 +285,7 @@ class Connection:
         self.socket_connection = SocketConnection()
 
     def connect(
-        self,
-        socket_path=DEFAULT_SOCKET_PATH,
-        timeout: int = 60,
-        buffer_size: int = 1024 * 1024,
+        self, socket_path, timeout: int = 60, buffer_size: int = 1024 * 1024,
     ):
         """Initialize and connect to keepassxc-proxy socket."""
 
@@ -330,13 +325,13 @@ class Connection:
 
         action = msg["action"]
         msg = json.dumps(msg)
-        encm = pysodium.crypto_box(
+        encrypted_message = pysodium.crypto_box(
             msg.encode(), self.nonce, self.server_key, self.get_private_key()
         )
         request = {
             "action": action,
             "nonce": encode(self.nonce),
-            "message": encode(encm),
+            "message": encode(encrypted_message),
             "clientID": self.clientid,
         }
         logging.debug("Sending message: " + str(msg))
@@ -507,7 +502,7 @@ class Connection:
 def parse_args(args_in=None):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="KeePassXC NaCl helper.",
+        description="Command-line access to KeePassXC using NaCl and keepassxc-proxy.",
         # epilog="Custom string fields should start with 'KPH: ', otherwise they can't be retrieved.",
     )
 
@@ -548,10 +543,36 @@ def parse_args(args_in=None):
     )
     parser.add_argument(
         "-l",
-        "--all-entries",
+        "--list-all",
         action="store_true",
         dest="show_all_matches",
         help="print all matched entries, not just the first one",
+    )
+
+    parser.add_argument(
+        "-j",
+        "--json",
+        action="store_true",
+        help="print response in json format",
+        dest="json",
+    )
+    parser.add_argument(
+        "--shell-escape",
+        action="store_true",
+        dest="shell_escape",
+        help="escape quotes, spaces, variables",
+    )
+    parser.add_argument(
+        "--format",
+        dest="format_str",
+        metavar="F",
+        help="set format for entry fields. Example: 'index: {index}\\nname: {name}\\nlogin: {login}\\npass: {password}\\nuuid: {uuid}\\n'. Don't forget the final newline (if you need it).",
+    )
+    parser.add_argument(
+        "--fields-format",
+        dest="fields_format_str",
+        metavar="F",
+        help="set format for entry string fields. Example: '{key}:{value}\\n'",
     )
 
     # file/socket paths
@@ -568,6 +589,7 @@ def parse_args(args_in=None):
         "--state",
         dest="file",
         help=f"set saved association state path. defaults to '{state_filepath_shown}'. if client id is set and this argument isn't used, filename defaults to ${{clientId}}.state",
+        # default value is applied later in order to react to client id
     )
 
     parser.add_argument(
@@ -581,66 +603,21 @@ def parse_args(args_in=None):
     parser.add_argument(
         "-d", "--debug", action="store_true", dest="debug", help="print debug info"
     )
-    parser.add_argument(
-        "-j",
-        "--json",
-        action="store_true",
-        help="print response in json format",
-        dest="json",
-    )
-    parser.add_argument(
-        "--eval",
-        metavar="SH",
-        dest="eval_format",
-        help="print in format suitable for eval (possible values: bash, fish)",
-    )
-    parser.add_argument(
-        "--field-prefixes",
-        action="store_true",
-        dest="field_prefixes",
-        help="prepend fields with a field prefix (N - entry name, U - username, P - password, I - uuid, K - field key, V - field value)",
-    )
-    parser.add_argument(
-        "--shell-escape",
-        action="store_true",
-        dest="shell_escape",
-        help="escape quotes, spaces, variables",
-    )
-    parser.add_argument(
-        "-0",
-        "--null-delimited",
-        action="store_true",
-        dest="null_delimited",
-        help="separate entries and fields with '\\0'",
-    )
-    parser.add_argument(
-        "--field-sep",
-        dest="user_field_separator",
-        metavar="SEP",
-        help="set separator for entry fields",
-    )
-    parser.add_argument(
-        "--entry-sep",
-        dest="user_entry_separator",
-        metavar="SEP",
-        help="set separator for entries",
-    )
 
     parser.add_argument("url", nargs="+", help="url(s) to print credentials for")
 
-    args = parser.parse_args(args_in)
-
-    # if file path is not provided, determine it based on clientid
-    args.file = args.file or os.path.join(
-        os.getenv("XDG_DATA_HOME"), "kpxc-getter", args.client + ".state"
-    )
-    # TODO: check if XDG_DATA_HOME needs a fallback value
-
-    return args
+    return parser.parse_args(args_in)
 
 
 def main():
     args = parse_args()
+
+    # args.fields_format_str = "{key_stripped}:{value}\n"
+
+    # if file path is not provided, set it based on clientid
+    if not args.file:
+        args.file = os.path.join(DEFAULT_STATE_FOLDER, args.client + ".state")
+
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
 
