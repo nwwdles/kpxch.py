@@ -58,8 +58,7 @@ def get_nonce(prev_nonce: bytes = None):
     """Increment nonce or generate a new one"""
     if prev_nonce:
         return increment_nonce(prev_nonce)
-    else:
-        return pysodium.randombytes(pysodium.crypto_box_NONCEBYTES)
+    return pysodium.randombytes(pysodium.crypto_box_NONCEBYTES)
 
 
 def increment_nonce(nonce: bytes) -> bytes:
@@ -88,8 +87,7 @@ def make_field(value, shell_escape, prefix=None, shell_var=None, eval_format=Non
     if shell_var:
         if eval_format == "fish":
             return "set -l " + shell_var + " " + shlex.quote(value)
-        else:
-            return shell_var + "=" + shlex.quote(value)
+        return shell_var + "=" + shlex.quote(value)
 
     if shell_escape:
         value = shlex.quote(value)
@@ -496,8 +494,7 @@ class Connection:
         msg = self.get_logins(url, submit_url, http_auth)
         if "entries" in msg:
             return msg["entries"]
-        else:
-            return []
+        return []
 
 
 def parse_args(args_in=None):
@@ -630,14 +627,14 @@ def main():
         entries = c.get_entries_for_url(url)
         if args.json:
             print(entries)
-        else:
-            if entries:
-                if args.show_all_matches:
-                    for i, entry in enumerate(entries):
-                        show_entry(entry, args, i)
-                else:
-                    entry = entries[0]
-                    show_entry(entry, args)
+            return
+        if entries:
+            if args.show_all_matches:
+                for i, entry in enumerate(entries):
+                    show_entry(entry, args, i)
+                return
+            entry = entries[0]
+            show_entry(entry, args)
 
 
 if __name__ == "__main__":
