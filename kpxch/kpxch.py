@@ -30,6 +30,7 @@ import socket
 import logging
 import argparse
 import shlex
+import time
 
 DEFAULT_SOCKET_PATH = os.path.join(os.getenv("XDG_RUNTIME_DIR"), "kpxc_server")
 DEFAULT_CLIENT_ID = "kpxch"
@@ -323,20 +324,48 @@ class Connection:
 
         action = msg["action"]
         msg = json.dumps(msg)
-        encrypted_message = pysodium.crypto_box(
-            msg.encode(), self.nonce, self.server_key, self.get_private_key()
-        )
-        request = {
-            "action": action,
-            "nonce": encode(self.nonce),
-            "message": encode(encrypted_message),
-            "clientID": self.clientid,
-            "triggerUnlock": "true",
-        }
-        logging.debug("Sending message: " + str(msg))
 
-        response = self.send_request(request)
-        return self.decode_message(response)
+        retries = 1
+        timeout = 3
+        while retries > 0:
+            retries -= 1
+
+            encrypted_message = pysodium.crypto_box(
+                msg.encode(), self.nonce, self.server_key, self.get_private_key()
+            )
+            request = {
+                "action": action,
+                "nonce": encode(self.nonce),
+                "message": encode(encrypted_message),
+                "clientID": self.clientid,
+                "triggerUnlock": "true",
+            }
+            logging.debug("Sending message: " + str(msg))
+            response = self.send_request(request)
+
+            if "errorCode" in response:
+                self.nonce = increment_nonce(self.nonce)
+                if response["errorCode"] == "1":
+                    err = response["error"]
+                    logging.error(
+                        f"Error in response: {err}. Trying again. Retries left: "
+                        + str(retries)
+                    )
+                    time.sleep(timeout)
+                    response = self.send_request(request)
+                    continue
+
+                # all other error codes crash the program
+                logging.fatal(
+                    "Uncaught error in response "
+                    + str(response)
+                    + " to message: "
+                    + str(msg),
+                )
+
+            return self.decode_message(response)
+
+        logging.fatal("Timed out")
 
     def decode_message(self, response: dict) -> (dict):
         """Decode response message.
