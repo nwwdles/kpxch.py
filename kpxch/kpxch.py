@@ -318,7 +318,7 @@ class Connection:
     # region REQUESTS
     #
 
-    def send_message_request(self, msg: dict) -> (bytes, dict):
+    def send_message_request(self, msg: dict) -> (dict):
         """Send request with a message and get decoded response json."""
 
         action = msg["action"]
@@ -338,7 +338,7 @@ class Connection:
         response = self.send_request(request)
         return self.decode_message(response)
 
-    def decode_message(self, response: dict) -> (bytes, dict):
+    def decode_message(self, response: dict) -> (dict):
         """Decode response message.
         
         Also verifies the received/expected nonce."""
@@ -360,7 +360,7 @@ class Connection:
 
         return msg_response
 
-    def change_public_keys(self) -> (bytes, dict):
+    def change_public_keys(self) -> (str):
         """Exchange public keys between database (server) and the client.
         
         This should be ran first. Received server key is used for all
@@ -380,7 +380,7 @@ class Connection:
 
         return server_key
 
-    def generate_password(self) -> (bytes, dict):
+    def generate_password(self) -> (dict):
         """Ask the server to generate a random password.
         
         Response contains a password."""
@@ -397,11 +397,11 @@ class Connection:
 
     # region MESSAGES
 
-    def get_databasehash(self) -> (bytes, dict):
+    def get_databasehash(self) -> (dict):
         msg = {"action": "get-databasehash"}
         return self.send_message_request(msg)
 
-    def associate(self) -> (bytes, dict):
+    def associate(self) -> (dict):
         """Send generated public key and ID key to the server.
         
         Only needs to be ran if not yet associated.
@@ -414,7 +414,7 @@ class Connection:
         }
         return self.send_message_request(msg)
 
-    def test_associate(self) -> (bytes, dict):
+    def test_associate(self) -> (dict):
         """Send association info to server to see if it remembers us."""
 
         msg = {
@@ -424,7 +424,7 @@ class Connection:
         }
         return self.send_message_request(msg)
 
-    def get_logins(self, url, submit_url=None, http_auth=None) -> (bytes, dict):
+    def get_logins(self, url, submit_url=None, http_auth=None) -> (dict):
         """Ask the server for entries for an url."""
 
         msg = {
@@ -438,7 +438,7 @@ class Connection:
 
     def set_login(
         self, url, submit_url, login, password, group, groupuuid, uuid
-    ) -> (bytes, dict):
+    ) -> (dict):
         msg = {
             "action": "set-login",
             "url": url,
@@ -453,15 +453,15 @@ class Connection:
         }
         return self.send_message_request(msg)
 
-    def lock_database(self) -> (bytes, dict):
+    def lock_database(self) -> (dict):
         msg = {"action": "lock-database"}
         return self.send_message_request(msg)
 
-    def get_database_groups(self) -> (bytes, dict):
+    def get_database_groups(self) -> (dict):
         msg = {"action": "get-database-groups"}
         return self.send_message_request(msg)
 
-    def create_new_group(self, group_name) -> (bytes, dict):
+    def create_new_group(self, group_name) -> (dict):
         msg = {"action": "create-new-group", "groupName": group_name}
         return self.send_message_request(msg)
 
